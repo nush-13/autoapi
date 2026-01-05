@@ -1,0 +1,26 @@
+timestamp,query,execution_time_ms
+2025-01-01 10:01:12,SELECT * FROM data,12
+2025-01-01 10:02:45,SELECT * FROM data WHERE category='A',18
+2025-01-01 10:03:02,SELECT * FROM data WHERE category='A',17
+2025-01-01 10:05:10,INSERT INTO data VALUES (...),25
+2025-01-01 10:07:33,SELECT * FROM data WHERE status='active',20
+2025-01-01 10:08:19,UPDATE data SET status='inactive' WHERE id=5,30
+2025-01-01 10:10:01,SELECT * FROM data WHERE category='A',16
+2025-01-01 10:12:44,DELETE FROM data WHERE id=10,28
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
