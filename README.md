@@ -12,4 +12,12 @@ Further phases will focus on:
 - Automatic REST API creation
 - Scalability and optimization
 
+### Phase 4 — FastAPI Integration
+
+- Added REST endpoint `/recommended-apis`
+- Exposed Swagger documentation at `/docs`
+- Reads SQL query logs, analyzes patterns, returns recommended APIs
+- Stack used: FastAPI, Pandas, Docker (optional)
+
  project is being developed incrementally.
+
