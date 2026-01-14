@@ -1,53 +1,131 @@
 import pandas as pd
 import re
-from collections import defaultdict
+from collections import defaultdict, Counter
 
-# Load logs
-df = pd.read_csv("../logs/query_logs.csv")
+def extract_where_column(query: str):
+    match = re.search(r'WHERE\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=', query, re.IGNORECASE)
+    if match:
+        return match.group(1).lower()
+    return None
 
-# Storage for insights
-stats = defaultdict(lambda: {
-    "SELECT": 0,
-    "INSERT": 0,
-    "UPDATE": 0,
-    "DELETE": 0,
-    "filters": defaultdict(int)
-})
 
-# Helper regex patterns
-query_type_pattern = re.compile(r"^(SELECT|INSERT|UPDATE|DELETE)", re.IGNORECASE)
-table_pattern = re.compile(r"(FROM|INTO|UPDATE)\s+(\w+)", re.IGNORECASE)
-where_pattern = re.compile(r"WHERE\s+(\w+)", re.IGNORECASE)
+def detect_query_type(query: str):
+    query = query.strip().upper()
 
-for query in df["query"]:
-    query = query.strip()
+    if query.startswith("SELECT"):
+        return "SELECT"
+    elif query.startswith("INSERT"):
+        return "INSERT"
+    elif query.startswith("UPDATE"):
+        return "UPDATE"
+    elif query.startswith("DELETE"):
+        return "DELETE"
+    else:
+        return "UNKNOWN"
 
-    # Detect query type
-    qt_match = query_type_pattern.search(query)
-    if not qt_match:
-        continue
-    query_type = qt_match.group(1).upper()
 
-    # Detect table name
-    table_match = table_pattern.search(query)
-    if not table_match:
-        continue
-    table_name = table_match.group(2)
+def extract_table_name(query: str):
+    query_up = query.upper()
 
-    stats[table_name][query_type] += 1
+    match = re.search(r'FROM\s+([a-zA-Z_][a-zA-Z0-9_]*)', query_up)
+    if match:
+        return match.group(1).lower()
 
-    # Detect filters
-    where_match = where_pattern.search(query)
-    if where_match:
-        column = where_match.group(1)
-        stats[table_name]["filters"][column] += 1
+    match = re.search(r'INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)', query_up)
+    if match:
+        return match.group(1).lower()
 
-# Pretty print results
-for table, info in stats.items():
-    print(f"\nTable: {table}")
-    print(" Query counts:")
-    for qtype in ["SELECT", "INSERT", "UPDATE", "DELETE"]:
-        print(f"  {qtype}: {info[qtype]}")
-    print(" Filters used:")
-    for col, count in info["filters"].items():
-        print(f"  {col}: {count}")
+    match = re.search(r'UPDATE\s+([a-zA-Z_][a-zA-Z0-9_]*)', query_up)
+    if match:
+        return match.group(1).lower()
+
+    return "unknown"
+
+
+def analyze_query_logs(csv_path):
+    df = pd.read_csv(csv_path)
+
+    summary = defaultdict(lambda: Counter())
+    filters = defaultdict(lambda: Counter())
+
+    for query in df['query']:
+        qtype = detect_query_type(query)
+        table = extract_table_name(query)
+        where_col = extract_where_column(query)
+
+        summary[table][qtype] += 1
+
+        if where_col:
+            filters[table][where_col] += 1
+
+    return summary, filters
+
+
+def infer_primary_key(filters_for_table: Counter):
+    if not filters_for_table:
+        return None
+
+    common = filters_for_table.most_common(1)[0][0]
+
+    # Priority override
+    priority = ["id", "user_id", "product_id", "order_id"]
+    for p in priority:
+        if p in filters_for_table:
+            return p
+
+    return common
+
+def generate_api_design(summary, filters):
+    api_design = []
+
+    for table, counts in summary.items():
+        table_filters = filters.get(table, {})
+        pk = infer_primary_key(table_filters)
+
+        if counts["SELECT"] > 0:
+            if table_filters:
+                api_design.append({
+                    "method": "GET",
+                    "endpoint": f"/{table}?filters",
+                    "reason": "Frequently filtered queries detected"
+                })
+            else:
+                api_design.append({
+                    "method": "GET",
+                    "endpoint": f"/{table}",
+                    "reason": "Frequently fetched table"
+                })
+
+        if counts["INSERT"] > 0:
+            api_design.append({
+                "method": "POST",
+                "endpoint": f"/{table}",
+                "reason": "Frequent inserts detected"
+            })
+
+        if counts["UPDATE"] > 0:
+            endpoint = f"/{table}/{{{pk}}}" if pk else f"/{table}/{{id}}"
+            api_design.append({
+                "method": "PUT",
+                "endpoint": endpoint,
+                "reason": "Frequent updates detected"
+            })
+
+        if counts["DELETE"] > 0:
+            endpoint = f"/{table}/{{{pk}}}" if pk else f"/{table}/{{id}}"
+            api_design.append({
+                "method": "DELETE",
+                "endpoint": endpoint,
+                "reason": "Frequent deletes detected"
+            })
+
+    return api_design
+
+if __name__ == "__main__":
+    summary, filters = analyze_query_logs("../logs/query_logs_v2.csv")
+    api_design = generate_api_design(summary, filters)
+
+    print("\n=== RECOMMENDED API DESIGN ===")
+    for api in api_design:
+        print(api)
+

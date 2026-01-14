@@ -1,0 +1,11 @@
+timestamp,query,execution_time_ms
+2025-01-01 10:00:01,SELECT * FROM users,5
+2025-01-01 10:01:02,SELECT * FROM users WHERE age > 18,7
+2025-01-01 10:02:15,SELECT * FROM products WHERE category='electronics',9
+2025-01-01 10:03:50,INSERT INTO users VALUES (...),12
+2025-01-01 10:04:22,UPDATE users SET age=25 WHERE id=10,15
+2025-01-01 10:05:10,DELETE FROM users WHERE id=8,8
+2025-01-01 10:06:45,INSERT INTO orders VALUES (...),14
+2025-01-01 10:07:30,UPDATE orders SET status='shipped' WHERE id=3,18
+2025-01-01 10:08:59,SELECT * FROM orders WHERE status='pending',6
+2025-01-01 10:09:40,SELECT * FROM products,4
